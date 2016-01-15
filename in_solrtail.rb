@@ -26,9 +26,13 @@ module Fluent
 		desc 'Identifier key that will be used against identifier value to query solr'
 		config_param :identifier_key, :string, :default => ''
 
+		desc 'Chunk size to read from solr'
+		config_param :chunk_size, :integer, :default => 100
+
 		## Override configure to validate custom parameters
 		def configure(conf)
 			super
+			@identifier_array = Array.new
 			if @identifier.empty?
 				raise ConfigError, 'Please specify the field identifier to pick value from a log entry'
 			end
@@ -39,7 +43,48 @@ module Fluent
 				raise ConfigError, 'Please specify the solr server address'
 			end
 
-			##TODO: create a solrtail log file to log results.
+			##solrtail log file to log results.
+			begin
+				file = File.open("/var/log/solrtail/candidate.log", "w")
+			rescue IOError => e
+				raise ConfigError, e
+			ensure
+				file.close unless file.nil?
+			end
+			
+		end
+
+		def get_from_solr
+
+			begin
+				if @solr_proxy.empty?
+					solr = RSolr.connect :url => @solr_address
+				else
+					solr = RSolr.connect :url => @solr_address, :proxy => @solr_proxy
+				end
+				query_value = @identifier_array.join(" OR ")
+				log.info "Solr query value: #{query_value}"
+				resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{query_value}"}
+				resp['response']['docs'].each {
+				if resp['response']['numFound'] > 0 
+					object = resp['response']['docs'][0].to_json
+					aFile = File.new("/var/log/solrtail/candidate.log", "a")
+					if aFile
+						aFile.syswrite("#{object}\n")
+						aFile.close
+					else
+						puts "Unable to open file!"
+					end 
+				else
+					log.warn "Document with (#{identifier_key}=#{identifier}) not found."
+				end
+				}
+			rescue => e
+				log.error "#{e}"
+			ensure
+				log.info "Cleaning chunk array"
+				@identifier_array.clear
+			end
 		end
 
 		## Oveerride convert lines method to implement
@@ -50,36 +95,20 @@ module Fluent
 				line.chomp!  # remove \n
 				@parser.parse(line) { |time, record|
 					if time && record
+						es.add(time, record)
 						identifier = record[@identifier]
-						## only if the identifier is available, we are going
-						## to query the solr server else we are just gonna
-						## log the record and continue with parsing.
 						if identifier
-
-							## Try connecting to the solr server
-							if @solr_proxy.empty?
-								solr = RSolr.connect :url => @solr_address
-							else
-								solr = RSolr.connect :url => @solr_address, :proxy => @solr_proxy
+							@identifier_array.push(identifier)
+							if @identifier_array.size >= chunk_size
+								log.info "Identifier Array Count : #{@identifier_array.size}"
+								get_from_solr
 							end
-
-							resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{identifier}"}
-							if resp['response']['numFound'] > 0
-								object = resp['response']['docs'][0].to_json
-								log.info object
-
-								## TODO: write json to logfile
-							else
-								log.warn "Document with (#{identifier_key}=#{identifier}) not found."
-							end
-						else
-							log.info "identifier not found: #{line.inspect}"	
-						end
-						#es.add(time, record)
+							
+						end 
 					else
 						log.warn "pattern not match: #{line.inspect}"
 					end
-				}
+				}    
 			rescue => e
 				log.warn line.dump, :error => e.to_s
 				log.debug_backtrace(e.backtrace)
