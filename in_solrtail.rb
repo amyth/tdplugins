@@ -1,6 +1,7 @@
 module Fluent
 	require 'rubygems'
 	require 'json'
+    require 'fileutils'
 
 	## Local imports
 	require '/var/lib/gems/1.9.1/gems/rsolr-1.0.13/lib/rsolr.rb'
@@ -29,6 +30,12 @@ module Fluent
 		desc 'Chunk size to read from solr'
 		config_param :chunk_size, :integer, :default => 100
 
+        desc 'Solr tail log file full path'
+        config_param :log_file, :string, :default => '/var/log/solrtail/solrtail.log'
+
+        desc 'Solr required fields (comma separated)'
+        config_param :required_fields, :string, :default => ''
+
 		## Override configure to validate custom parameters
 		def configure(conf)
 			super
@@ -42,16 +49,19 @@ module Fluent
 			if @solr_address.empty?
 				raise ConfigError, 'Please specify the solr server address'
 			end
+            if @required_fields.empty?
+                raise ConfigError, 'Please specify required fields.'
+            end
 
 			##solrtail log file to log results.
 			begin
-				file = File.open("/var/log/solrtail/candidate.log", "w")
+                FileUtils.mkdir_p(File.dirname(@log_file))
+				file = File.open(@log_file, "w")
 			rescue IOError => e
 				raise ConfigError, e
 			ensure
 				file.close unless file.nil?
 			end
-			
 		end
 
 		def get_from_solr
@@ -64,17 +74,17 @@ module Fluent
 				end
 				query_value = @identifier_array.join(" OR ")
 				log.info "Solr query value: #{query_value}"
-				resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{query_value}"}
+				resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{query_value}", :fl => @required_fields}
 				resp['response']['docs'].each {
-				if resp['response']['numFound'] > 0 
+				if resp['response']['numFound'] > 0
 					object = resp['response']['docs'][0].to_json
-					aFile = File.new("/var/log/solrtail/candidate.log", "a")
+					aFile = File.new(@log_file, "a")
 					if aFile
 						aFile.syswrite("#{object}\n")
 						aFile.close
 					else
 						puts "Unable to open file!"
-					end 
+					end
 				else
 					log.warn "Document with (#{identifier_key}=#{identifier}) not found."
 				end
@@ -103,12 +113,11 @@ module Fluent
 								log.info "Identifier Array Count : #{@identifier_array.size}"
 								get_from_solr
 							end
-							
-						end 
+						end
 					else
 						log.warn "pattern not match: #{line.inspect}"
 					end
-				}    
+				}
 			rescue => e
 				log.warn line.dump, :error => e.to_s
 				log.debug_backtrace(e.backtrace)
