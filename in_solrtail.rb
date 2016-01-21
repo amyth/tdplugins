@@ -33,8 +33,8 @@ module Fluent
         desc 'Solr tail log file full path'
         config_param :log_file, :string, :default => '/var/log/solrtail/solrtail.log'
 
-        desc 'Solr required fields (comma separated)'
-        config_param :required_fields, :string, :default => ''
+		desc 'Solr required fields (comma separated)'
+		config_param :required_fields, :string, :default => ''
 
 		## Override configure to validate custom parameters
 		def configure(conf)
@@ -49,13 +49,13 @@ module Fluent
 			if @solr_address.empty?
 				raise ConfigError, 'Please specify the solr server address'
 			end
-            if @required_fields.empty?
-                raise ConfigError, 'Please specify required fields.'
+			if @required_fields.empty?
+				   raise ConfigError, 'Please specify required fields.'
             end
 
 			##solrtail log file to log results.
 			begin
-                FileUtils.mkdir_p(File.dirname(@log_file))
+                FileUtils.mkdir_p File.dirname(@log_file), :mode => 755
 				file = File.open(@log_file, "w")
 			rescue IOError => e
 				raise ConfigError, e
@@ -74,7 +74,7 @@ module Fluent
 				end
 				query_value = @identifier_array.join(" OR ")
 				log.info "Solr query value: #{query_value}"
-				resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{query_value}", :fl => @required_fields}
+				resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{query_value}", :fl => "#{required_fields}"}
 				resp['response']['docs'].each {
 				if resp['response']['numFound'] > 0
 					object = resp['response']['docs'][0].to_json
