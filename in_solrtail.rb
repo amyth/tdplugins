@@ -78,7 +78,7 @@ module Fluent
 				resp['response']['docs'].each {
 				if resp['response']['numFound'] > 0
                     objects = resp['response']['docs']
-                    for object in objects:
+                    for object in objects
     					object = resp['response']['docs'][0].to_json
 	    				aFile = File.new(@log_file, "a")
 		    			if aFile
