@@ -77,14 +77,17 @@ module Fluent
 				resp = solr.get 'select', :params => {:q => "#{identifier_key}:#{query_value}", :fl => "#{required_fields}"}
 				resp['response']['docs'].each {
 				if resp['response']['numFound'] > 0
-					object = resp['response']['docs'][0].to_json
-					aFile = File.new(@log_file, "a")
-					if aFile
-						aFile.syswrite("#{object}\n")
-						aFile.close
-					else
-						puts "Unable to open file!"
-					end
+                    objects = resp['response']['docs']
+                    for object in objects:
+    					object = resp['response']['docs'][0].to_json
+	    				aFile = File.new(@log_file, "a")
+		    			if aFile
+			    			aFile.syswrite("#{object}\n")
+				    		aFile.close
+					    else
+						    puts "Unable to open file!"
+					    end
+                    end
 				else
 					log.warn "Document with (#{identifier_key}=#{identifier}) not found."
 				end
