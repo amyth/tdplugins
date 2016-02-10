@@ -1,4 +1,6 @@
 module Fluent
+
+	## Gem imports
 	require 'rubygems'
 	require 'json'
 	require 'fileutils'
