@@ -33,14 +33,14 @@ module Fluent
 		desc 'Chunk size to read from solr'
 		config_param :chunk_size, :integer, :default => 100
 
-        desc 'Solr tail log file full path'
-        config_param :log_file, :string, :default => '/var/log/solrtail/solrtail.log'
+		desc 'Solr tail log file full path'
+		config_param :log_file, :string, :default => '/var/log/solrtail/solrtail.log'
 
 		desc 'Solr required fields (comma separated)'
 		config_param :required_fields, :string, :default => ''
 
-        desc 'List of fields to replace with nil if these are blank strings'
-        config_param :replace_with_nil, :string, :default => ''
+		desc 'List of fields to replace with nil if these are blank strings'
+		config_param :replace_with_nil, :string, :default => ''
 
 		desc 'Enables mongo data merger'
 		config_param :mongo_merge_enabled, :bool, :default => false
